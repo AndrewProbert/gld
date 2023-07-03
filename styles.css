@@ -1,0 +1,74 @@
+/* Reset some default styles */
+    body, header, nav, ul {
+      margin: 0;
+      padding: 0;
+      padding-right: 20px; /* Add padding to the right side for scrollbar */
+
+    }
+  
+    /* Navigation bar styles */
+    header {
+        position: fixed;
+        top: 0;
+        left: 0;        
+        width: 100%;
+
+      background-color: #1f2d3d;
+      color: #fff;
+      padding: 20px;
+      z-index: 100; /* Add a higher z-index value */
+
+
+    }
+  
+    nav {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;      
+
+    }
+  
+    .logo img {
+      max-width: 100px;
+    }
+  
+    .navbar {
+      list-style-type: none;
+      font-size: larger;
+    }
+  
+    .navbar li {
+      display: inline;
+      margin-left: 20px;
+      padding-right: 10px;
+    }
+  
+    .navbar li a {
+      color: #fff;
+      text-decoration: none;
+    }
+  
+    /* Centered content styles */
+    .content {
+      text-align: center;
+      margin-top: 40px;
+      max-width: 100vh;
+      margin-left: auto;
+      margin-right: auto;
+      text-align: justify;
+    }
+  
+    .content h1 {
+      font-size: 24px;
+      margin-bottom: 10px;
+      z-index: 9999; /* Add a higher z-index value */
+
+    }
+  
+    .content p {
+      font-size: 16px;
+      line-height: 1.5;
+      text-align-last: left;
+      hyphens: auto;
+      max-width: 100%;
+    }
