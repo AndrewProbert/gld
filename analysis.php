@@ -225,6 +225,7 @@ $symbol = 'GLD';
       </ul>
     </nav>
   </header>
+  <div class="content">
     <h1><br><br>Options Analysis</h1>
 
     <?php
@@ -233,6 +234,7 @@ $symbol = 'GLD';
     ?>
 
     <!-- Add additional HTML content as needed -->
+    </div>
 </body>
 </html>
 
