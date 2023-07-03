@@ -40,6 +40,13 @@ function obv($url) {
     $min_obv = -max($volume) * count($timestamps);
     $score = ($obv - $min_obv) / ($max_obv - $min_obv) * 200 - 100;
     // Return the score
+    echo '<br>';
+     echo '<br>';
+     echo '<br>';
+    echo '<br>';
+     echo '<br>';
+     echo '<br>';
+    echo $score;
     return $score;
   }
   
@@ -81,6 +88,10 @@ function obv($url) {
     $min_ad = -max($volume) * count($timestamps);
     $score = ($ad - $min_ad) / ($max_ad - $min_ad) * 200 - 100;
     // Return the score
+    echo '<br>';
+     echo '<br>';
+     echo '<br>';
+    echo $score;
     return $score;
   }
 
@@ -173,6 +184,10 @@ function adx($url, $period) {
     $min_adx = 0;
     $score = ($adx[count($adx) - 1] - $min_adx) / ($max_adx - $min_adx) * 200 - 100;
     // Return the score
+    echo '<br>';
+     echo '<br>';
+     echo '<br>';
+    echo $score;
     return $score;
   }
 
@@ -207,6 +222,10 @@ function aroon($url, $period) {
     $min_aroon_diff = -200;
     $score = (($aroon_up[count($aroon_up) - 1] - $aroon_down[count($aroon_down) - 1]) - $min_aroon_diff) / ($max_aroon_diff - $min_aroon_diff) * 200 - 100;
     // Return the score
+    echo '<br>';
+     echo '<br>';
+     echo '<br>';
+    echo $score;
     return $score;
   }
 
@@ -286,6 +305,10 @@ function macd($url, $fast, $slow, $signal) {
     
 
     // Return the score
+    echo '<br>';
+     echo '<br>';
+     echo '<br>';
+    echo $score;
     return $score;
   }
 
@@ -361,6 +384,10 @@ function macd($url, $fast, $slow, $signal) {
         // Scale the rsi to a score between -100 and 100
         $score = ($rsi / $max_rsi) * 200 - 100;
         // Return the score
+        echo '<br>';
+     echo '<br>';
+     echo '<br>';
+        echo $score;
         return $score;
     }
   
@@ -422,6 +449,11 @@ function stoch($url, $k_period, $d_period) {
     }
    
      // Return the score
+     echo '<br>';
+     echo '<br>';
+     echo '<br>';
+
+     echo $score;
     return $score;
   }
   
