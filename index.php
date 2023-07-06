@@ -22,8 +22,8 @@
       <ul class="navbar">
         <li><a href="analysis.php">Track</a></li>
         <li><a href="#">Chat</a></li>
-        <li><a href="analysis.php">News</a></li>
-        <li><a href="#">Contact</a></li>
+        <li><a href="#.php">News</a></li>
+        <li><a href="alt_analysis.php">Alt analysis test</a></li>
       </ul>
     </nav>
   </header>
