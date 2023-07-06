@@ -14,6 +14,11 @@ if (isset($jsonData['chart']['result'][0]['meta']['regularMarketPrice'])) {
     $price = $jsonData['chart']['result'][0]['meta']['regularMarketPrice'];
     //echo "Live Price: " . $price;
     //echo "<br>";
+} else {
+    echo "Error: Live Price not found";
+    echo "<br>";
+    echo "Check Internet Access";
+    exit;
 }
 
 
