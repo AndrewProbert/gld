@@ -21,9 +21,9 @@
       
       <ul class="navbar">
         <li><a href="analysis.php">Track</a></li>
-        <li><a href="#">Chat</a></li>
-        <li><a href="#.php">News</a></li>
-        <li><a href="alt_analysis.php">Alt analysis test</a></li>
+        <li><a href="news.php">News</a></li>
+        <li><a href="http://localhost/finance/stocks/index.php">Stock Scanner</a></li>
+        <li><a href="contact.php">Contact</a></li>
       </ul>
     </nav>
   </header>

@@ -1,546 +1,574 @@
 <?php
-// stock_info.php
 
-// Retrieve the symbol from the query parameter
-$symbol = 'GLD';
-
-// Fetch stock data from Yahoo Finance API
-$url = "https://query1.finance.yahoo.com/v8/finance/chart/{$symbol}?interval=1d";
-$data = file_get_contents($url);
-$jsonData = json_decode($data, true);
-
-// Check if the necessary data is available
-if (isset($jsonData['chart']['result'][0]['meta']['regularMarketPrice'])) {
-    $price = $jsonData['chart']['result'][0]['meta']['regularMarketPrice'];
-    //echo "Live Price: " . $price;
-    //echo "<br>";
-} else {
-    echo "Error: Live Price not found";
-    echo "<br>";
-    echo "Check Internet Access";
-    exit;
-}
+$url = "https://query1.finance.yahoo.com/v8/finance/chart/gld?interval=1m";
 
 
-if (isset($jsonData['chart']['result'][0]['indicators']['quote'][0]['volume'])) {
-    $stockVolume = $jsonData['chart']['result'][0]['indicators']['quote'][0]['volume'][0];
-    //echo "Stock Volume: " . $stockVolume;
-    //echo "<br>";
-}
-// Function to calculate historical performance score using MACD
-function MACD($symbol) {
-    // Fetch historical data for the symbol using Yahoo Finance
-    $url = "https://query1.finance.yahoo.com/v8/finance/chart/{$symbol}?interval=1d&range=1y";
 
-    // Initialize cURL
-    $ch = curl_init();
-    curl_setopt($ch, CURLOPT_URL, $url);
-    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
 
-    // Execute the cURL request
-    $response = curl_exec($ch);
-
-    // Check if cURL request was successful
-    if ($response === false) {
-        return null;
+// A function to calculate the on balance volume (OBV) for the gld etf
+function obv($url) {
+    // Get the json data from the url
+    $json = file_get_contents($url);
+    // Decode the json data into an associative array
+    $data = json_decode($json, true);
+    // Get the timestamps, close prices and volumes from the data
+    $timestamps = $data["chart"]["result"][0]["timestamp"];
+    $close = $data["chart"]["result"][0]["indicators"]["quote"][0]["close"];
+    $volume = $data["chart"]["result"][0]["indicators"]["quote"][0]["volume"];
+    // Initialize the obv and the previous close price
+    $obv = 0;
+    $prev_close = $close[0];
+    // Loop through the data points
+    for ($i = 0; $i < count($timestamps); $i++) {
+      // If the current close price is higher than the previous one, add the volume to the obv
+      if ($close[$i] > $prev_close) {
+        $obv += $volume[$i];
+      }
+      // If the current close price is lower than the previous one, subtract the volume from the obv
+      elseif ($close[$i] < $prev_close) {
+        $obv -= $volume[$i];
+      }
+      // If the current close price is equal to the previous one, do nothing
+      else {
+        // Do nothing
+      }
+      // Update the previous close price
+      $prev_close = $close[$i];
     }
+    // Normalize the obv to a score between -100 and 100
+    $max_obv = max($volume) * count($timestamps);
+    $min_obv = -max($volume) * count($timestamps);
+    $score = ($obv - $min_obv) / ($max_obv - $min_obv) * 200 - 100;
+    // Return the score
+    echo '<br>';
+     echo '<br>';
+     echo '<br>';
+    echo '<br>';
+     echo '<br>';
+     echo '<br>';
+    echo $score;
+    return $score;
+  }
+  
+  
+  // A function to calculate the accumulation/distribution (AD) for the gld etf
+  function ad($url) {
+    // Get the json data from the url
+    $json = file_get_contents($url);
+    // Decode the json data into an associative array
+    $data = json_decode($json, true);
+    // Get the timestamps, high, low, close and volume from the data
+    $timestamps = $data["chart"]["result"][0]["timestamp"];
+    $high = $data["chart"]["result"][0]["indicators"]["quote"][0]["high"];
+    $low = $data["chart"]["result"][0]["indicators"]["quote"][0]["low"];
+    $close = $data["chart"]["result"][0]["indicators"]["quote"][0]["close"];
+    $volume = $data["chart"]["result"][0]["indicators"]["quote"][0]["volume"];
+    // Initialize the ad and the previous close price
+    $ad = 0;
+    $prev_close = $close[0];
+    // Loop through the data points
+    for ($i = 0; $i < count($timestamps); $i++) {
+      // Calculate the money flow multiplier
+      $mfm = ($close[$i] - $low[$i]) - ($high[$i] - $close[$i]);
+      if ($high[$i] != $low[$i]) {
+        $mfm /= ($high[$i] - $low[$i]);
+      }
+      else {
+        $mfm = 0;
+      }
+      // Calculate the money flow volume
+      $mfv = $mfm * $volume[$i];
+      // Add the money flow volume to the ad
+      $ad += $mfv;
+      // Update the previous close price
+      $prev_close = $close[$i];
+    }
+    // Normalize the ad to a score between -100 and 100
+    $max_ad = max($volume) * count($timestamps);
+    $min_ad = -max($volume) * count($timestamps);
+    $score = ($ad - $min_ad) / ($max_ad - $min_ad) * 200 - 100;
+    // Return the score
+    echo '<br>';
+     echo '<br>';
+     echo '<br>';
+    echo $score;
+    return $score;
+  }
 
-    // Close cURL connection
-    curl_close($ch);
-
-    // Decode the JSON response
-    $data = json_decode($response, true);
-
-    // Extract the desired data (closing prices)
-    if (isset($data['chart']['result'][0]['indicators']['quote'][0]['close'])) {
-        $closeData = $data['chart']['result'][0]['indicators']['quote'][0]['close'];
-
-        // Calculate the MACD indicator
-        $macdData = calculateMACD($closeData);
-
-        // Calculate the score based on the MACD values
-        if (!empty($macdData)) {
-            $positiveMACDCount = 0;
-            foreach ($macdData as $macd) {
-                if ($macd > 0) {
-                    $positiveMACDCount++;
-                }
-            }
-
-            // Calculate the score based on the positive MACD values
-            $positiveMACDScore = ($positiveMACDCount / count($macdData)) * 100;
-            $score = $positiveMACDScore;
-            // Cap the score at 100
-            $score = min($score, 100);
-
-            return $score;
+  // A function to calculate the average directional index (ADX) for the gld etf
+function adx($url, $period) {
+    // Get the json data from the url
+    $json = file_get_contents($url);
+    // Decode the json data into an associative array
+    $data = json_decode($json, true);
+    // Get the timestamps, high, low and close from the data
+    $timestamps = $data["chart"]["result"][0]["timestamp"];
+    $high = $data["chart"]["result"][0]["indicators"]["quote"][0]["high"];
+    $low = $data["chart"]["result"][0]["indicators"]["quote"][0]["low"];
+    $close = $data["chart"]["result"][0]["indicators"]["quote"][0]["close"];
+    // Initialize the arrays for true range, directional movement and smoothed averages
+    $tr = array();
+    $dm_plus = array();
+    $dm_minus = array();
+    $atr = array();
+    $pdi = array();
+    $mdi = array();
+    $dx = array();
+    $adx = array();
+    // Loop through the data points
+    for ($i = 0; $i < count($timestamps); $i++) {
+      // Calculate the true range
+      if ($i == 0) {
+        // For the first point, use the high-low range
+        $tr[$i] = $high[$i] - $low[$i];
+      }
+      else {
+        // For the subsequent points, use the maximum of three values
+        $tr[$i] = max($high[$i] - $low[$i], abs($high[$i] - $close[$i - 1]), abs($low[$i] - $close[$i - 1]));
+      }
+      // Calculate the directional movement
+      if ($i > 0) {
+        // For the subsequent points, use the difference between highs and lows
+        $dm_plus[$i] = max($high[$i] - $high[$i - 1], 0);
+        $dm_minus[$i] = max($low[$i - 1] - $low[$i], 0);
+        // If both are positive, take the larger one and set the other to zero
+        if ($dm_plus[$i] > 0 && $dm_minus[$i] > 0) {
+          if ($dm_plus[$i] > $dm_minus[$i]) {
+            $dm_minus[$i] = 0;
+          }
+          else {
+            $dm_plus[$i] = 0;
+          }
         }
+      }
+      // Calculate the smoothed averages
+      if ($i >= $period - 1) {
+        // For the points after the period, use the exponential moving average formula
+        if ($i == $period - 1) {
+          // For the first point, use the simple average of the initial period
+          $atr[$i] = array_sum(array_slice($tr, 0, $period)) / $period;
+          $pdi[$i] = array_sum(array_slice($dm_plus, 1, $period)) / $atr[$i] * 100;
+          $mdi[$i] = array_sum(array_slice($dm_minus, 1, $period)) / $atr[$i] * 100;
+        }
+        else {
+          // For the subsequent points, use the previous value and the current value
+          $atr[$i] = ($atr[$i - 1] * ($period - 1) + $tr[$i]) / $period;
+          $pdi[$i] = ($pdi[$i - 1] * ($period - 1) + ($dm_plus[$i] / $atr[$i]) * 100) / $period;
+          $mdi[$i] = ($mdi[$i - 1] * ($period - 1) + ($dm_minus[$i] / $atr[$i]) * 100) / $period;
+        }
+        // Calculate the directional index
+        if ($pdi[$i] + $mdi[$i] > 0) {
+          // If both are positive, use the absolute difference over the sum
+          $dx[$i] = abs($pdi[$i] - $mdi[$i]) / ($pdi[$i] + $mdi[$i]) * 100;
+        }
+        else {
+          // If both are zero or negative, use zero
+          $dx[$i] = 0;
+        }
+        // Calculate the average directional index
+        if ($i >= ($period - 1) * 2) {
+          // For the points after two periods, use the exponential moving average formula
+          if ($i == ($period - 1) * 2) {
+            // For the first point, use the simple average of the initial period
+            $adx[$i] = array_sum(array_slice($dx, $period - 1, $period)) / $period;
+          }
+          else {
+            // For the subsequent points, use the previous value and the current value
+            $adx[$i] = ($adx[$i - 1] * ($period - 1) + $dx[$i]) / $period;
+          }
+        }
+      }
     }
-    echo "Error MACD Function";
-    return null;
-}
+    // Normalize the adx to a score between -100 and 100
+    $max_adx = 100;
+    $min_adx = 0;
+    $score = ($adx[count($adx) - 1] - $min_adx) / ($max_adx - $min_adx) * 200 - 100;
+    // Return the score
+    echo '<br>';
+     echo '<br>';
+     echo '<br>';
+    echo $score;
+    return $score;
+  }
 
-// Function to calculate MACD values
-function calculateMACD($data) {
-    $ema12 = calculateEMA($data, 12);
-    $ema26 = calculateEMA($data, 26);
 
-    $macdLine = array_map(function ($ema12Value, $ema26Value) {
-        return $ema12Value - $ema26Value;
-    }, $ema12, $ema26);
 
-    return $macdLine;
-}
-
-// Function to calculate Exponential Moving Average (EMA)
-function calculateEMA($data, $period) {
-    $multiplier = 2 / ($period + 1);
-    $ema = [];
-
-    // Calculate the initial SMA as the first value
-    $sma = array_slice($data, 0, $period);
-    $ema[] = array_sum($sma) / $period;
-
-    // Calculate EMA for the remaining values
-    for ($i = $period; $i < count($data); $i++) {
-        $ema[] = ($data[$i] - $ema[$i - $period]) * $multiplier + $ema[$i - $period];
+  // A function to calculate the aroon indicator for the gld etf
+function aroon($url, $period) {
+    // Get the json data from the url
+    $json = file_get_contents($url);
+    // Decode the json data into an associative array
+    $data = json_decode($json, true);
+    // Get the timestamps, high and low from the data
+    $timestamps = $data["chart"]["result"][0]["timestamp"];
+    $high = $data["chart"]["result"][0]["indicators"]["quote"][0]["high"];
+    $low = $data["chart"]["result"][0]["indicators"]["quote"][0]["low"];
+    // Initialize the arrays for aroon up and down
+    $aroon_up = array();
+    $aroon_down = array();
+    // Loop through the data points
+    for ($i = 0; $i < count($timestamps); $i++) {
+      // Calculate the aroon up and down
+      if ($i >= $period - 1) {
+        // For the points after the period, use the formula based on the highest high and lowest low
+        $highest_high = max(array_slice($high, $i - ($period - 1), $period));
+        $lowest_low = min(array_slice($low, $i - ($period - 1), $period));
+        $aroon_up[$i] = (($period - (array_search($highest_high, array_slice($high, $i - ($period - 1), $period)) + 1)) / $period) * 100;
+        $aroon_down[$i] = (($period - (array_search($lowest_low, array_slice($low, $i - ($period - 1), $period)) + 1)) / $period) * 100;
+      }
     }
+    // Normalize the aroon difference to a score between -100 and 100
+    $max_aroon_diff = 200;
+    $min_aroon_diff = -200;
+    $score = (($aroon_up[count($aroon_up) - 1] - $aroon_down[count($aroon_down) - 1]) - $min_aroon_diff) / ($max_aroon_diff - $min_aroon_diff) * 200 - 100;
+    // Return the score
+    echo '<br>';
+     echo '<br>';
+     echo '<br>';
+    echo $score;
+    return $score;
+  }
 
-    return $ema;
-}
+    $fast = 12;
+    $slow = 26;
+    $signal = 9;
 
 
-// Function to calculate price momentum score based on RSI
-function RSI($symbol) {
-    // Fetch price history for the symbol using Yahoo Finance or your preferred data source
-    $url = "https://query1.finance.yahoo.com/v8/finance/chart/{$symbol}?interval=1d&range=1mo";
-
-    // Initialize cURL
-    $ch = curl_init();
-    curl_setopt($ch, CURLOPT_URL, $url);
-    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-
-    // Execute the cURL request
-    $response = curl_exec($ch);
-
-    // Check if cURL request was successful
-    if ($response === false) {
-        return null;
+  // A function to calculate the macd for the gld etf
+function macd($url, $fast, $slow, $signal) {
+    // Get the json data from the url
+    $json = file_get_contents($url);
+    // Decode the json data into an associative array
+    $data = json_decode($json, true);
+    // Get the timestamps and close from the data
+    $timestamps = $data["chart"]["result"][0]["timestamp"];
+    $close = $data["chart"]["result"][0]["indicators"]["quote"][0]["close"];
+    // Initialize the arrays for exponential moving averages, macd line and signal line
+    $ema_fast = array();
+    $ema_slow = array();
+    $macd_line = array();
+    $signal_line = array();
+    // Loop through the data points
+    for ($i = 0; $i < count($timestamps); $i++) {
+      // Calculate the exponential moving averages
+      if ($i >= $fast - 1) {
+        // For the points after the fast period, use the exponential moving average formula
+        if ($i == $fast - 1) {
+          // For the first point, use the simple average of the initial period
+          $ema_fast[$i] = array_sum(array_slice($close, 0, $fast)) / $fast;
+        }
+        else {
+          // For the subsequent points, use the previous value and the current value
+          $ema_fast[$i] = ($close[$i] - $ema_fast[$i - 1]) * (2 / ($fast + 1)) + $ema_fast[$i - 1];
+        }
+      }
+      if ($i >= $slow - 1) {
+        // For the points after the slow period, use the exponential moving average formula
+        if ($i == $slow - 1) {
+          // For the first point, use the simple average of the initial period
+          $ema_slow[$i] = array_sum(array_slice($close, 0, $slow)) / $slow;
+        }
+        else {
+          // For the subsequent points, use the previous value and the current value
+          $ema_slow[$i] = ($close[$i] - $ema_slow[$i - 1]) * (2 / ($slow + 1)) + $ema_slow[$i - 1];
+        }
+      }
+      // Calculate the macd line
+      if ($i >= max($fast - 1, $slow - 1)) {
+        // For the points after both periods, use the difference between fast and slow ema
+        $macd_line[$i] = $ema_fast[$i] - $ema_slow[$i];
+      }
+      // Calculate the signal line
+      if ($i >= max($fast - 1, $slow - 1) + ($signal - 1)) {
+        // For the points after both periods plus signal period, use the exponential moving average formula
+        if ($i == max($fast - 1, $slow - 1) + ($signal - 1)) {
+          // For the first point, use the simple average of the initial period
+          $signal_line[$i] = array_sum(array_slice($macd_line, max($fast - 1, $slow - 1), $signal)) / $signal;
+        }
+        else {
+          // For the subsequent points, use the previous value and the current value
+          $signal_line[$i] = ($macd_line[$i] - $signal_line[$i - 1]) * (2 / ($signal + 1)) + $signal_line[$i - 1];
+        }
+      }
     }
+    // Normalize the macd difference to a score between -100 and 100
+    $max_macd_diff = max($macd_line) - min($signal_line);
+    $min_macd_diff = min($macd_line) - max($signal_line);
+    if ($max_macd_diff > abs($min_macd_diff)) {
+      // If positive difference is larger than negative difference, use it as maximum range
+      $score = (($macd_line[count($macd_line) - 1] - $signal_line[count($signal_line) - 1]) / abs($max_macd_diff)) * 100;
+    }
+    else {
+      // If negative difference is larger than positive difference, use it as maximum range
+      $score = (($macd_line[count($macd_line) - 1] - $signal_line[count($signal_line) - 1]) / abs($min_macd_diff)) * (-100);
+    }
+    
 
-    // Close cURL connection
-    curl_close($ch);
+    // Return the score
+    echo '<br>';
+     echo '<br>';
+     echo '<br>';
+    echo $score;
+    return $score;
+  }
 
-    // Decode the JSON response
-    $data = json_decode($response, true);
 
-    // Extract the desired data (closing prices)
-    if (isset($data['chart']['result'][0]['indicators']['quote'][0]['close'])) {
-        $closeData = $data['chart']['result'][0]['indicators']['quote'][0]['close'];
 
-        // Calculate the RSI (Relative Strength Index)
-        $rsi = calculateRSI($closeData);
+  $period = 14;
 
-        // Calculate the price momentum score based on RSI
-        $score = calculateScoreFromRSI($rsi);
-        //echo "Price Momentum Score (RSI-based): {$score}\n";
+  // A function to calculate the relative strength index (RSI) for the gld etf
+    function rsi($url, $period) {
+        // Get the json data from the url
+        $json = file_get_contents($url);
+        // Decode the json data into an associative array
+        $data = json_decode($json, true);
+        // Get the timestamps and close from the data
+        $timestamps = $data["chart"]["result"][0]["timestamp"];
+        $close = $data["chart"]["result"][0]["indicators"]["quote"][0]["close"];
+        // Initialize the arrays for price changes, average gains and losses, and relative strength
+        $change = array();
+        $avg_gain = array();
+        $avg_loss = array();
+        $rs = array();
+        // Loop through the data points
+        for ($i = 0; $i < count($timestamps); $i++) {
+        // Calculate the price change
+        if ($i > 0) {
+            // For the subsequent points, use the difference between current and previous close
+            $change[$i] = $close[$i] - $close[$i - 1];
+        }
+        // Calculate the average gain and loss
+        if ($i >= $period) {
+            // For the points after the period, use the formula based on previous and current gains and losses
+            if ($i == $period) {
+            // For the first point, use the simple average of the initial period
+            $avg_gain[$i] = array_sum(array_filter(array_slice($change, 1, $period), function($x) {return $x > 0;})) / $period;
+            $avg_loss[$i] = abs(array_sum(array_filter(array_slice($change, 1, $period), function($x) {return $x < 0;})) / $period);
+            }
+            else {
+            // For the subsequent points, use the previous value and the current value
+            if ($change[$i] > 0) {
+                // If current change is positive, add it to the gain and use zero for loss
+                $avg_gain[$i] = ($avg_gain[$i - 1] * ($period - 1) + $change[$i]) / $period;
+                $avg_loss[$i] = ($avg_loss[$i - 1] * ($period - 1)) / $period;
+            }
+            else {
+                // If current change is negative or zero, use zero for gain and add its absolute value to the loss
+                $avg_gain[$i] = ($avg_gain[$i - 1] * ($period - 1)) / $period;
+                $avg_loss[$i] = ($avg_loss[$i - 1] * ($period - 1) + abs($change[$i])) / $period;
+            }
+            }
+        }
+        // Calculate the relative strength
+        if ($i >= $period) {
+            // For the points after the period, use the ratio of average gain to average loss
+            if ($avg_loss[$i] > 0) {
+            // If average loss is positive, use it as denominator
+            $rs[$i] = $avg_gain[$i] / $avg_loss[$i];
+            }
+            else {
+            // If average loss is zero, use infinity as relative strength
+            $rs[$i] = INF;
+            }
+        }
+        }
+        // Normalize the rsi to a score between -100 and 100
+        $max_rsi = max($rs);
+        if (is_infinite($max_rsi)) {
+        // If maximum rsi is infinity, use a large number as approximation
+        $max_rsi = pow(10,9);
+        }
+        
+        // Calculate the rsi using inverse of logarithmic function
+        $rsi = 100 - 100 / (1 + $rs[$i]);
+        // Scale the rsi to a score between -100 and 100
+        $score = ($rsi / $max_rsi) * 200 - 100;
+        // Return the score
+        echo '<br>';
+     echo '<br>';
+     echo '<br>';
+        echo $score;
         return $score;
     }
+  
+    // A function to calculate the stochastic oscillator for the gld etf
+function stoch($url, $k_period, $d_period) {
+    // Get the json data from the url
+    $json = file_get_contents($url);
+    // Decode the json data into an associative array
+    $data = json_decode($json, true);
+    // Get the timestamps, high and low from the data
+    $timestamps = $data["chart"]["result"][0]["timestamp"];
+    $high = $data["chart"]["result"][0]["indicators"]["quote"][0]["high"];
+    $low = $data["chart"]["result"][0]["indicators"]["quote"][0]["low"];
+    $close = $data["chart"]["result"][0]["indicators"]["quote"][0]["close"]; // Added this line
 
-    return null;
-}
-
-// Function to calculate RSI (Relative Strength Index)
-function calculateRSI($closeData) {
-    // Set the time period for RSI calculation
-    $timePeriod = 14;
-
-    // Calculate the price changes
-    $priceChanges = [];
-    $previousPrice = null;
-    foreach ($closeData as $price) {
-        if ($previousPrice !== null) {
-            $priceChange = $price - $previousPrice;
-            $priceChanges[] = $priceChange;
+    // Initialize the arrays for highest high, lowest low, %K line and %D line
+    $highest_high = array();
+    $lowest_low = array();
+    $k_line = array();
+    $d_line = array();
+    // Loop through the data points
+    for ($i = 0; $i < count($timestamps); $i++) {
+      // Calculate the highest high and lowest low
+      if ($i >= $k_period - 1) {
+        // For the points after the k period, use the maximum and minimum of the previous k periods
+        $highest_high[$i] = max(array_slice($high, $i - ($k_period - 1), $k_period));
+        $lowest_low[$i] = min(array_slice($low, $i - ($k_period - 1), $k_period));
+      }
+      // Calculate the %K line
+      if ($i >= $k_period - 1) {
+        // For the points after the k period, use the formula based on current close, highest high and lowest low
+        if ($highest_high[$i] != $lowest_low[$i]) {
+          // If highest high is not equal to lowest low, use them as denominator and numerator
+          $k_line[$i] = ($close[$i] - $lowest_low[$i]) / ($highest_high[$i] - $lowest_low[$i]) * 100;
         }
-        $previousPrice = $price;
-    }
-
-    // Calculate the gains and losses
-    $gains = [];
-    $losses = [];
-    foreach ($priceChanges as $priceChange) {
-        if ($priceChange > 0) {
-            $gains[] = $priceChange;
-            $losses[] = 0;
-        } else {
-            $gains[] = 0;
-            $losses[] = abs($priceChange);
+        else {
+          // If highest high is equal to lowest low, use zero as %K value
+          $k_line[$i] = 0;
         }
+      }
+      // Calculate the %D line
+      if ($i >= ($k_period - 1) + ($d_period - 1)) {
+        // For the points after both periods, use the simple moving average of the previous d periods of %K line
+        $d_line[$i] = array_sum(array_slice($k_line, $i - ($d_period - 1), $d_period)) / $d_period;
+      }
     }
-
-    // Calculate the average gains and losses
-    $avgGain = array_sum(array_slice($gains, 0, $timePeriod)) / $timePeriod;
-    $avgLoss = array_sum(array_slice($losses, 0, $timePeriod)) / $timePeriod;
-
-    // Calculate the initial RSI
-    if ($avgLoss == 0) {
-        $rsi = 100;
-    } else {
-        $rs = $avgGain / $avgLoss;
-        $rsi = 100 - (100 / (1 + $rs));
+    // Normalize the stochastic difference to a score between -100 and 100
+    $max_stoch_diff = max($k_line) - min($d_line);
+    $min_stoch_diff = min($k_line) - max($d_line);
+    
+   
+     if ($max_stoch_diff > abs($min_stoch_diff)) {
+      // If positive difference is larger than negative difference, use it as maximum range
+      $score = (($k_line[count($k_line) - 1] - $d_line[count($d_line) - 1]) / abs($max_stoch_diff)) * 100;
     }
-
-    // Calculate the subsequent RSI values
-    $dataCount = count($closeData);
-    for ($i = $timePeriod; $i < $dataCount; $i++) {
-        $priceChange = $priceChanges[$i - 1];
-        if ($priceChange > 0) {
-            $gain = $priceChange;
-            $loss = 0;
-        } else {
-            $gain = 0;
-            $loss = abs($priceChange);
-        }
-
-        $avgGain = (($avgGain * ($timePeriod - 1)) + $gain) / $timePeriod;
-        $avgLoss = (($avgLoss * ($timePeriod - 1)) + $loss) / $timePeriod;
-
-        if ($avgLoss == 0) {
-            $rsiValue = 100;
-        } else {
-            $rs = $avgGain / $avgLoss;
-            $rsiValue = 100 - (100 / (1 + $rs));
-        }
-
-        $rsi = round($rsiValue, 2);
+    else {
+      // If negative difference is larger than positive difference, use it as maximum range
+      $score = (($k_line[count($k_line) - 1] - $d_line[count($d_line) - 1]) / abs($min_stoch_diff)) * (-100);
     }
+   
+     // Return the score
+     echo '<br>';
+     echo '<br>';
+     echo '<br>';
 
-    return $rsi;
-}
-
-// Function to calculate the score based on RSI
-function calculateScoreFromRSI($rsi) {
-    // Adjust the RSI score based on a desired scale
-    $score = ($rsi - 50) * 2;
-    $score = max(min($score, 100), 0);
+     echo $score;
     return $score;
-}
+  }
+  
+    $k_period = 14;
+    $d_period = 3;
 
 
-function calculateOBVScore($symbol)
-{
-    $apiUrl = "https://query1.finance.yahoo.com/v8/finance/chart/$symbol";
+// A function to create an overall score based on the indicators and their weights
+function overall_score($url, $weights) {
+    // Define the parameters for each indicator
+    $obv_period = 14;
+    $adx_period = 14;
+    $aroon_period = 14;
+    $macd_fast = 12;
+    $macd_slow = 26;
+    $macd_signal = 9;
+    $rsi_period = 14;
+    $stoch_k_period = 14;
+    $stoch_d_period = 3;
     
-    // Calculate the date range for three months ago
-    $endDate = date("Y-m-d");
-    $startDate = date("Y-m-d", strtotime("-3 months", strtotime($endDate)));
+   
+     // Calculate the scores for each indicator using the previous functions
+    $obv_score = obv($url);
+    $adx_score = adx($url, $adx_period);
+    $aroon_score = aroon($url, $aroon_period);
+    $macd_score = macd($url, $macd_fast, $macd_slow, $macd_signal);
+    $rsi_score = rsi($url, $rsi_period);
+    $stoch_score = stoch($url, $stoch_k_period, $stoch_d_period);
+     
+     // Create an array of the scores and their corresponding weights
+    $scores = array(
+      "obv" => array("score" => $obv_score, "weight" => $weights["obv"]),
+      "adx" => array("score" => $adx_score, "weight" => $weights["adx"]),
+      "aroon" => array("score" => $aroon_score, "weight" => $weights["aroon"]),
+      "macd" => array("score" => $macd_score, "weight" => $weights["macd"]),
+      "rsi" => array("score" => $rsi_score, "weight" => $weights["rsi"]),
+      "stoch" => array("score" => $stoch_score, "weight" => $weights["stoch"])
+    );
     
-    // Create the Yahoo Finance API URL with the date range
-    $apiUrl .= "?period1=" . strtotime($startDate) . "&period2=" . strtotime($endDate) . "&interval=1d&events=history";
-    
-    // Fetch data from the Yahoo Finance API
-    $jsonData = file_get_contents($apiUrl);
-    $data = json_decode($jsonData, true);
-    
-    // Extract the volume data from the API response
-    $volumes = $data['chart']['result'][0]['indicators']['quote'][0]['volume'];
-    
-    // Calculate the OBV score
-    $obvScore = 0;
-    $previousVolume = null;
-    
-    foreach ($volumes as $volume) {
-        if ($previousVolume === null) {
-            $previousVolume = $volume;
-        } else {
-            if ($volume > $previousVolume) {
-                $obvScore += $volume;
-            } elseif ($volume < $previousVolume) {
-                $obvScore -= $volume;
-            }
-            
-            $previousVolume = $volume;
-        }
+   
+  
+     // Calculate the weighted average of the scores
+    $total_score = 0;
+    $total_weight = 0;
+    foreach ($scores as $indicator) {
+      // Multiply the score by the weight and add it to the total score
+      $total_score += ($indicator["score"] * $indicator["weight"]);
+      // Add the weight to the total weight
+      $total_weight += ($indicator["weight"]);
     }
-    
-    // Normalize the OBV score to a range of 0 to 100
-    $minVolume = min($volumes);
-    $maxVolume = max($volumes);
-    $normalizedScore = ($obvScore - $minVolume) / ($maxVolume - $minVolume) * 100;
-    
-    return $normalizedScore;
-}
-
-
-function calculateADLScore($symbol)
-{
-    $apiUrl = "https://query1.finance.yahoo.com/v8/finance/chart/$symbol";
-    
-    // Calculate the date range for three months ago
-    $endDate = date("Y-m-d");
-    $startDate = date("Y-m-d", strtotime("-3 months", strtotime($endDate)));
-    
-    // Create the Yahoo Finance API URL with the date range
-    $apiUrl .= "?period1=" . strtotime($startDate) . "&period2=" . strtotime($endDate) . "&interval=1d&events=history";
-    
-    // Fetch data from the Yahoo Finance API
-    $jsonData = file_get_contents($apiUrl);
-    $data = json_decode($jsonData, true);
-    
-    // Extract the high, low, close, and volume data from the API response
-    $highs = $data['chart']['result'][0]['indicators']['quote'][0]['high'];
-    $lows = $data['chart']['result'][0]['indicators']['quote'][0]['low'];
-    $closes = $data['chart']['result'][0]['indicators']['quote'][0]['close'];
-    $volumes = $data['chart']['result'][0]['indicators']['quote'][0]['volume'];
-    
-    // Calculate the ADL score
-    $adlScore = [];
-    $previousADL = 0;
-    
-    for ($i = 0; $i < count($closes); $i++) {
-        $moneyFlowMultiplier = (($closes[$i] - $lows[$i]) - ($highs[$i] - $closes[$i])) / ($highs[$i] - $lows[$i]);
-        $moneyFlowVolume = $moneyFlowMultiplier * $volumes[$i];
-        
-        $adl = $previousADL + $moneyFlowVolume;
-        $adlScore[] = $adl;
-        $previousADL = $adl;
+    // Divide the total score by the total weight to get the average score
+    if ($total_weight > 0) {
+      // If total weight is positive, use it as denominator
+      $average_score = ($total_score / $total_weight);
     }
-    
-    // Normalize the ADL score to a range of 0 to 100
-    $minADL = min($adlScore);
-    $maxADL = max($adlScore);
-    
-    $normalizedScore = [];
-    foreach ($adlScore as $adl) {
-        $score = ($adl - $minADL) / ($maxADL - $minADL) * 100;
-        $normalizedScore[] = $score;
+    else {
+      // If total weight is zero or negative, use zero as average score
+      $average_score = 0;
     }
-    
-    return $normalizedScore;
-}
-/*
-$adlScores = calculateADLScore($symbol);
-echo "ADL Scores for $symbol:<br>";
-foreach ($adlScores as $score) {
-    echo round($score, 2) . "<br>";
-}
+     
+     
+     // Return the average score
+     return round($average_score,2); // Round to two decimal places
+  }
 
-*/
+  $weights = array(
+    "obv" => 0.2,
+    "adx" => 0.1,
+    "aroon" => 0.1,
+    "macd" => 0.2,
+    "rsi" => 0.2,
+    "stoch" => 0.2
+);
+$score = overall_score($url, $weights);
 
-
-
-
-function calculateADX($symbol)
-{
-    $apiUrl = "https://query1.finance.yahoo.com/v8/finance/chart/$symbol";
-    
-    // Calculate the date range for three months ago
-    $endDate = date("Y-m-d");
-    $startDate = date("Y-m-d", strtotime("-3 months", strtotime($endDate)));
-    
-    // Create the Yahoo Finance API URL with the date range
-    $apiUrl .= "?period1=" . strtotime($startDate) . "&period2=" . strtotime($endDate) . "&interval=1d&events=history";
-    
-    // Fetch data from the Yahoo Finance API
-    $jsonData = file_get_contents($apiUrl);
-    $data = json_decode($jsonData, true);
-    
-    // Extract the high, low, and close data from the API response
-    $highs = $data['chart']['result'][0]['indicators']['quote'][0]['high'];
-    $lows = $data['chart']['result'][0]['indicators']['quote'][0]['low'];
-    $closes = $data['chart']['result'][0]['indicators']['quote'][0]['close'];
-    
-    // Calculate the True Range (TR)
-    $trueRanges = [];
-    for ($i = 1; $i < count($closes); $i++) {
-        $trueRange = max(
-            $highs[$i] - $lows[$i],
-            abs($highs[$i] - $closes[$i - 1]),
-            abs($lows[$i] - $closes[$i - 1])
-        );
-        $trueRanges[] = $trueRange;
-    }
-    
-    // Calculate the Directional Movement (DM+ and DM-)
-    $dmPlus = [];
-    $dmMinus = [];
-    for ($i = 1; $i < count($closes); $i++) {
-        $upMove = $highs[$i] - $highs[$i - 1];
-        $downMove = $lows[$i - 1] - $lows[$i];
-        
-        if ($upMove > $downMove && $upMove > 0) {
-            $dmPlus[] = $upMove;
-            $dmMinus[] = 0;
-        } elseif ($downMove > $upMove && $downMove > 0) {
-            $dmPlus[] = 0;
-            $dmMinus[] = $downMove;
-        } else {
-            $dmPlus[] = 0;
-            $dmMinus[] = 0;
-        }
-    }
-    
-    // Calculate the Average True Range (ATR)
-    $atr = array_sum($trueRanges) / count($trueRanges);
-    
-    // Calculate the Directional Index (DI+ and DI-)
-    $diPlus = (array_sum($dmPlus) / $atr) * 100;
-    $diMinus = (array_sum($dmMinus) / $atr) * 100;
-    
-    // Calculate the Average Directional Index (ADX)
-    $adx = (abs($diPlus - $diMinus) / ($diPlus + $diMinus)) * 100;
-    
-    return $adx;
-}
-
-
-function calculateAroonIndicator($symbol)
-{
-    $apiUrl = "https://query1.finance.yahoo.com/v8/finance/chart/$symbol";
-    
-    // Calculate the date range for three months ago
-    $endDate = date("Y-m-d");
-    $startDate = date("Y-m-d", strtotime("-3 months", strtotime($endDate)));
-    
-    // Create the Yahoo Finance API URL with the date range
-    $apiUrl .= "?period1=" . strtotime($startDate) . "&period2=" . strtotime($endDate) . "&interval=1d&events=history";
-    
-    // Fetch data from the Yahoo Finance API
-    $jsonData = file_get_contents($apiUrl);
-    $data = json_decode($jsonData, true);
-    
-    // Extract the high and low data from the API response
-    $highs = $data['chart']['result'][0]['indicators']['quote'][0]['high'];
-    $lows = $data['chart']['result'][0]['indicators']['quote'][0]['low'];
-    
-    // Calculate the Aroon Indicator
-    $aroonUp = [];
-    $aroonDown = [];
-    
-    $period = 14; // Aroon Indicator period
-    
-    for ($i = $period; $i < count($highs); $i++) {
-        $highestHighIndex = array_search(max(array_slice($highs, $i - $period, $period + 1)), array_slice($highs, $i - $period, $period + 1));
-        $lowestLowIndex = array_search(min(array_slice($lows, $i - $period, $period + 1)), array_slice($lows, $i - $period, $period + 1));
-        
-        $aroonUp[] = (($period - $highestHighIndex) / $period) * 100;
-        $aroonDown[] = (($period - $lowestLowIndex) / $period) * 100;
-    }
-    
-    return array('aroon_up' => $aroonUp, 'aroon_down' => $aroonDown);
-}
-
-/*
-$aroon = calculateAroonIndicator($symbol);
-
-echo "Aroon Indicator for $symbol:<br>";
-for ($i = 0; $i < count($aroon['aroon_up']); $i++) {
-    echo "Aroon Up: " . round($aroon['aroon_up'][$i], 2) . "% | Aroon Down: " . round($aroon['aroon_down'][$i], 2) . "%<br>";
-}
-
-*/
-
-function calculateStochasticOscillator($symbol)
-{
-    $apiUrl = "https://query1.finance.yahoo.com/v8/finance/chart/$symbol";
-    
-    // Calculate the date range for three months ago
-    $endDate = date("Y-m-d");
-    $startDate = date("Y-m-d", strtotime("-3 months", strtotime($endDate)));
-    
-    // Create the Yahoo Finance API URL with the date range
-    $apiUrl .= "?period1=" . strtotime($startDate) . "&period2=" . strtotime($endDate) . "&interval=1d&events=history";
-    
-    // Fetch data from the Yahoo Finance API
-    $jsonData = file_get_contents($apiUrl);
-    $data = json_decode($jsonData, true);
-    
-    // Extract the high, low, and close data from the API response
-    $highs = $data['chart']['result'][0]['indicators']['quote'][0]['high'];
-    $lows = $data['chart']['result'][0]['indicators']['quote'][0]['low'];
-    $closes = $data['chart']['result'][0]['indicators']['quote'][0]['close'];
-    
-    // Calculate the Stochastic Oscillator
-    $stochasticOscillator = [];
-    
-    $period = 14; // Stochastic Oscillator period
-    
-    for ($i = $period; $i < count($closes); $i++) {
-        $highestHigh = max(array_slice($highs, $i - $period + 1, $period));
-        $lowestLow = min(array_slice($lows, $i - $period + 1, $period));
-        
-        $currentClose = $closes[$i];
-        
-        $stochasticOscillator[] = (($currentClose - $lowestLow) / ($highestHigh - $lowestLow)) * 100;
-    }
-    
-    return $stochasticOscillator;
-}
-
-/*
-
-$stochastic = calculateStochasticOscillator($symbol);
-
-echo "Stochastic Oscillator for $symbol:<br>";
-foreach ($stochastic as $value) {
-    echo round($value, 2) . "<br>";
-}
-
-
-*/
-
-/*
-
-$adx = calculateADX($symbol);
-echo "Average Directional Index (ADX): {$adx}\n";
+?>
 
 
 
 
 
-$obvScore = calculateOBVScore($symbol);
-echo "On-Balance Volume Score: {$obvScore}\n";
 
-echo "Price Momentum Score (RSI-based): ".RSI($symbol)."\n";
-echo "Price Momentum Score (MACD-based): ".MACD($symbol)."\n";
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Options Analysis</title>
+    <link rel="stylesheet" type="text/css" href="styles.css">
 
-
-
-*/
-
-
-function calculateFinalScore($symbol)
-{
-    // Calculate individual indicator scores
-    $macd = MACD($symbol);
-    $rsi = RSI($symbol);
-    $obvScore = calculateOBVScore($symbol);
-    $adx = calculateADX($symbol);
-    $aroon = calculateAroonIndicator($symbol);
-    $stochastic = calculateStochasticOscillator($symbol);
+</head>
+<body>
 
 
-    // Calculate average score
-    //$averageScore = ($macd + $rsi + $obvScore + $adx + array_sum($aroon['aroon_up']) + array_sum($aroon['aroon_down']) + array_sum($stochastic)) / 5;
-    $averageScore = ($macd + $rsi + $obvScore + $adx ) /4;
+<header>
+    <nav>
+      <div class="logo">
+        <a href="index.php"> <img src="gloptionW.png" alt="Logo"></a>
+      </div>
+      
 
-    // Normalize average score to a range of 0 to 100
-    $minScore = 0;
-    $maxScore = 100;
-    $normalizedScore = ($averageScore - $minScore) / ($maxScore - $minScore) * 100;
-    
-    return $normalizedScore;
-}
-echo "Price Momentum Score (RSI-based): ".RSI($symbol)."\n";
-echo '<br>';
-echo "Price Momentum Score (MACD-based): ".MACD($symbol)."\n";
-echo '<br>';
 
-echo "On-Balance Volume Score: ".calculateOBVScore($symbol)."\n";
-echo '<br>';
 
-echo "Average Directional Index (ADX): ".calculateADX($symbol)."\n";
-echo '<br>';
+      
+      <ul class="navbar">
+        <li><a href="analysis.php">Track</a></li>
+        <li><a href="#">Chat</a></li>
+        <li><a href="analysis.php">News</a></li>
+        <li><a href="#">Contact</a></li>
+      </ul>
+    </nav>
+  </header>
+  <div class="content">
+    <h1><br><br>Options Analysis</h1>
+    <p><?php echo $score; ?></p>
 
-echo "Final Score: ".calculateFinalScore($symbol)."\n";
+    </div>
+</body>
+</html>
+
